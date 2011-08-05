@@ -3,7 +3,7 @@
 	<meta charset="UTF-8">
 	<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
 	
-	<title>Zrczr, a MMOG 2D shooting game</title>
+	<title>Zrczr, an epic 2D shooting game</title>
 	<meta name="description" content="">
 	<meta name="author" content="">
 	
@@ -12,12 +12,19 @@
 	<link rel="shortcut icon" href="/favicon.ico">
 	<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 	<link rel="stylesheet" href="css/style.css?v=2">
+	<link rel='stylesheet' href="css/trontastic/jquery-ui-1.8.14.custom.css">
+	<script type="text/javascript" src="closure-library/closure/goog/base.js"></script>
+	<script>
+		goog.require('goog.math');
+		goog.require('goog.math.Coordinate');
+		goog.require('goog.math.Vec2');
+	</script>
 
 </head>
 <body>
 	<div id="container">
 		<header>
-
+			
 		</header>
 
 		<div id="main" role="main">
@@ -30,13 +37,25 @@
 	</div>
 
 	<script type="text/javascript" src="js/libs/jquery-1.5.2.js"></script>
+	<script type="text/javascript" src="js/jquery-ui-1.8.14.custom.min.js"></script>
 	<script type="text/javascript" src="js/libs/amplify.min.js"></script>
 	<script type="text/javascript" src="js/libs/underscore.js"></script>
 	<script type="text/javascript" src="js/libs/backbone.js"></script>
+	<script type="text/javascript" src="js/libs/domEvents.backbone.js"></script>
+	<script type="text/javascript" src="js/libs/keyboard.backbone.js"></script>
+	<script type="text/javascript" src="js/libs/requestAnimFrame.js"></script>
+	<script type="text/javascript" src="js/libs/Stats.js"></script>
 	<script type="text/javascript" src="js/plugins.js"></script>
 	<script type="text/javascript" src="js/script.js"></script>
 	<!--[if lt IE 7 ]>
 	<script src="js/libs/dd_belatedpng.js"></script>
 	<script> DD_belatedPNG.fix('img, .png_bg');</script>
-	<![endif]--></body>
+	<![endif]-->
+	<!-- Prompt IE 6 users to install Chrome Frame. Remove this if you want to support IE 6.
+		chromium.org/developers/how-tos/chrome-frame-getting-started -->
+	<!--[if lt IE 9 ]>
+		<script src="//ajax.googleapis.com/ajax/libs/chrome-frame/1.0.3/CFInstall.min.js"></script>
+		<script>window.attachEvent('onload',function(){CFInstall.check({mode:'overlay'})})</script>
+	<![endif]-->
+  </body>
 </html>
