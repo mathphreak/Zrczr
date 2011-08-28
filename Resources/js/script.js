@@ -22,6 +22,10 @@ var conv = function(corv) {
 	}
 }
 
+function makeVector(angle) {
+	return new Vector(sin(angle), -cos(angle));
+}
+
 Zrczr.App.Server = {
 	setup: function() {
 		return {
@@ -64,7 +68,7 @@ Zrczr.Models.World = Backbone.Model.extend({
 		var me = this.get("me");
 		context.save();
 		context.translate(context.canvas.width / 2, context.canvas.height / 2);
-//		context.rotate(-me.get("rotation"));
+		context.rotate(-me.get("rotation"));
 		context.translate(-me.get("location").x, -me.get("location").y);
 		Zrczr.App.Background.draw(context);
 		this.get("walls").each(drawIt);
@@ -87,11 +91,13 @@ Zrczr.Models.World = Backbone.Model.extend({
 			return collisionDetection(me, w);
 		}));
 	},
-	checkBullets: function() {
-		var me = this.get("me");
-		return _.any(this.get("bullets").map(function(w) {
-			return collisionDetection(me, w);
-		}));
+	checkBullets: function(recipient) {
+		if (!recipient) {
+			recipient = this.get("me");
+		}
+		return this.get("bullets").detect(function(w) {
+			return collisionDetection(w, recipient);
+		});
 	}
 });
 
@@ -102,6 +108,7 @@ Zrczr.Models.Person = Backbone.Model.extend({
 		var rot = amplify.store("rotation");
 		if (!rot) {
 			rot = (Math.random() * 2 * Math.PI);
+			rot = Math.floor(rot / (Math.PI / 20)) * (Math.PI / 20);
 		}
 		var siz = amplify.store("size");
 		if (!siz) {
@@ -148,16 +155,20 @@ Zrczr.Models.Person = Backbone.Model.extend({
 		var loc = this.get("location");
 		var rotation = this.get("rotation");
 		hitWall = Zrczr.App.World.checkWalls();
+		if (this.targetRot && Math.abs(this.targetRot-rotation) < Math.PI / 20) {
+			this.targetRot = undefined;
+		}
 		if (k.up && !hitWall) {
 			var vec = new Vector(sin(rotation), -cos(rotation));
 			loc = Coordinate.sum(loc, vec);
 		}
-		if (k.left) {
+		if (k.left || this.targetRot && this.targetRot < rotation) {
 			rotation -= Math.PI / 20;
-		} else if (k.right) {
+		} else if (k.right || this.targetRot && this.targetRot > rotation) {
 			rotation += Math.PI / 20;
 		} else if (k.down) {
-			rotation += Math.PI;
+			this.targetRot = this.lastLeft ? rotation + Math.PI : rotation - Math.PI;
+			this.lastLeft = !this.lastLeft;
 			k.down = false;
 		}
 		this.set({
@@ -171,6 +182,14 @@ Zrczr.Models.Person = Backbone.Model.extend({
 			this.justDropped = true;
 		} else if (!k.drop) {
 			this.justDropped = false;
+		}
+		if (k.fire && !this.justFired) {
+			Zrczr.App.World.get("bullets").add({
+				parent: this
+			});
+			this.justFired = true;
+		} else if (!k.fire) {
+			this.justFired = false;
 		}
 		amplify.store("rotation", rotation);
 	}
@@ -193,7 +212,6 @@ Zrczr.Models.Wall = Backbone.Model.extend({
 		var loc = this.get("location");
 		var rot = this.get("rotation");
 		var size = this.get("size");
-		var size2 = 2*size;
 		context.save();
 		context.translate(loc.x, loc.y);
 		context.rotate(rot);
@@ -207,7 +225,79 @@ Zrczr.Models.Wall = Backbone.Model.extend({
 		context.fill();
 		context.restore();
 	},
-	move: function() {}
+	move: function() {
+		// seems to me this function should be a no-op...
+		// but really, it does all the collision detection checking
+		var pwned = Zrczr.App.World.checkBullets(this);
+		if (!!pwned && !this.death) {
+			this.die();
+			pwned.die();
+		}
+		var size = this.get("size");
+		if (!!this.death) {
+			if ($.now() - this.death > 100) {
+				if (size > 0) {
+					size--;
+					this.set({
+						size: size
+					});
+					this.death = $.now();
+				} else {
+					this.collection.remove(this);
+				}
+			}
+		}
+	},
+	die: function() {
+		this.death = $.now();
+	}
+});
+
+Zrczr.Models.Bullet = Backbone.Model.extend({
+	initialize: function() {
+		var parent = this.get("parent");
+		var loc = parent.get("location");
+		var rotation = parent.get("rotation");
+		var parentMovement = new Vector(sin(rotation), -cos(rotation));
+		var parentSize = parent.get("size");
+		var size = parentSize;
+		if (!!this.get("size")) {
+			size = this.get("size");
+		}
+		this.set({
+			location: Coordinate.sum(loc, parentMovement.scale(parentSize*2 + 2)),
+			rotation: rotation,
+			size: size,
+			birth: Date.now()
+		});
+	},
+	draw: function(context) {
+		var loc = this.get("location");
+		var rot = this.get("rotation");
+		var size = this.get("size");
+		var anotherFrame = makeVector(rot).scale(2);
+		context.save();
+		context.translate(loc.x + anotherFrame.x, loc.y + anotherFrame.y);
+		context.rotate(rot);
+		context.strokeStyle = "black";
+		context.beginPath();
+		context.moveTo(0, 0);
+		context.lineTo(0, -size);
+		context.stroke();
+		context.restore();
+	},
+	move: function() {
+		var loc = this.get("location");
+		var rot = this.get("rotation");
+		var anotherFrame = makeVector(rot).scale(2);
+		loc = Coordinate.sum(loc, anotherFrame);
+		this.set({
+			location: loc
+		});
+	},
+	die: function() {
+		this.collection.remove(this);
+	}
 });
 
 Zrczr.App.Backgrounds.Empty = new Zrczr.Models.Background({
@@ -323,6 +413,8 @@ function canvasWorks(canvas) {
 $(function(){
 	Backbone.Keyboard.bindArrowWASD();
 	Backbone.Keyboard.keyMeans(' '.charCodeAt(0), 'drop');
+	Backbone.Keyboard.keyMeans('Q'.charCodeAt(0), 'fire');
+	Backbone.Keyboard.keyMeans('E'.charCodeAt(0), 'fire');
 	Zrczr.App.Background = Zrczr.App.Backgrounds.Grid;
 	Zrczr.App.World = new Zrczr.Models.World();
 	Zrczr.App.World.set({
